@@ -1,0 +1,42 @@
+%% One refund request through all five stacks. X-Trace-Id and X-User-Id travel on every hop.
+sequenceDiagram
+    autonumber
+    actor C as Customer (client)
+    participant R as router (OpenAI Agents SDK)
+    participant L as LLM gateway
+    participant P as policy (LangGraph)
+    participant K as risk (CrewAI)
+    participant F as refund (Google ADK)
+    participant N as notify (AutoGen)
+
+    C->>R: POST /tasks "refund ORD-1001"
+    R->>R: load SQLiteSession(context_id) + user case file
+    R->>L: chat (history + tools)
+    L-->>R: tool_call ask_policy
+
+    R->>P: POST /tasks (question)
+    P->>P: recall long-term store, checkpoint
+    P->>L: chat (+ search_policy tool)
+    L-->>P: tool_call search_policy
+    P-->>R: policy text
+
+    R->>L: chat (+ policy result)
+    L-->>R: tool_call ask_risk
+    R->>K: POST /tasks (order, amount, customer)
+    K->>L: chat (+ assess_risk tool)
+    K-->>R: {score, decision}
+
+    alt decision == approve
+        R->>F: POST /tasks "refund ORD-1001 $120"
+        F->>F: issue_refund, write user:/app: state + ledger
+        F-->>R: refunded
+    else decision == escalate
+        Note over R,F: refund agent is never called
+    end
+
+    R->>N: POST /tasks "tell the customer"
+    N->>N: send_email to outbox, append ListMemory, save_state
+    N-->>R: queued
+
+    R->>R: append case-file note
+    R-->>C: final answer + nested tool_calls

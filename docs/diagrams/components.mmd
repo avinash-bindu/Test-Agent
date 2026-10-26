@@ -1,0 +1,42 @@
+%% Component view: five agents, five stacks, one model gateway. Each agent owns its own state store.
+flowchart LR
+    client["Client / demo.py / tests"]
+
+    subgraph agents["Agent services (A2A-lite over HTTP, one venv each)"]
+        router["router :9101<br/>OpenAI Agents SDK"]
+        policy["policy :9102<br/>LangGraph"]
+        risk["risk :9103<br/>CrewAI"]
+        refund["refund :9104<br/>Google ADK"]
+        notify["notify :9105<br/>AutoGen"]
+    end
+
+    llm["LLM gateway :9100<br/>scripted OpenAI-compatible model<br/>(swap base URL for a real provider)"]
+
+    subgraph stores["Per-agent state (data/&lt;agent&gt;/)"]
+        s_router[("SQLiteSession<br/>+ case_files.json")]
+        s_policy[("SqliteSaver checkpoints<br/>+ SqliteStore")]
+        s_risk[("CrewAI memory<br/>+ task history")]
+        s_refund[("ADK session DB<br/>user:/app: state + ledger")]
+        s_notify[("save_state JSON<br/>+ ListMemory JSON + outbox")]
+    end
+
+    client -->|"POST /tasks"| router
+    router -->|"ask_policy"| policy
+    router -->|"ask_risk"| risk
+    router -->|"ask_refund"| refund
+    router -->|"ask_notify"| notify
+
+    router & policy & risk & refund & notify -->|"/v1/chat/completions"| llm
+
+    router --- s_router
+    policy --- s_policy
+    risk --- s_risk
+    refund --- s_refund
+    notify --- s_notify
+
+    gov(["Governance as a service<br/>(to be attached)"]):::future
+    gov -.->|"GET /state/&lt;ctx&gt;, /memory, agent card"| agents
+    gov -.->|"screen model traffic"| llm
+    gov -.->|"screen agent-to-agent calls"| agents
+
+    classDef future stroke-dasharray: 5 5
