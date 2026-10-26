@@ -1,0 +1,44 @@
+%% The contract every agent exposes, and how each stack fills the two memory tiers.
+classDiagram
+    class AgentApp {
+        <<abstract>>
+        +name
+        +stack
+        +memory_map
+        +handle(task) str
+        +export_state(context_id) dict
+        +export_memory() dict
+        +card() dict
+    }
+    class RouterAgent {
+        session: OpenAI SQLiteSession
+        long-term: per-user case_files.json
+    }
+    class PolicyAgent {
+        session: LangGraph SqliteSaver checkpoints
+        long-term: LangGraph SqliteStore namespaced KV
+    }
+    class RiskAgent {
+        session: CrewAI task output history
+        long-term: CrewAI memory
+    }
+    class RefundAgent {
+        session: ADK DatabaseSessionService events + state
+        long-term: ADK user: and app: scoped state
+    }
+    class NotifyAgent {
+        session: AutoGen save_state JSON
+        long-term: AutoGen ListMemory JSON
+    }
+    class Endpoints {
+        GET /.well-known/agent.json
+        GET /state/context_id
+        GET /memory
+        POST /tasks
+    }
+    AgentApp <|-- RouterAgent
+    AgentApp <|-- PolicyAgent
+    AgentApp <|-- RiskAgent
+    AgentApp <|-- RefundAgent
+    AgentApp <|-- NotifyAgent
+    AgentApp ..> Endpoints : served by service.serve()

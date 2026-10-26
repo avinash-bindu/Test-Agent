@@ -1,0 +1,5 @@
+google-adk[db]
+litellm
+aiosqlite
+mcp
+pywin32; sys_platform == 'win32'
